@@ -89,6 +89,12 @@
         Generates a layer (mask) from all the nan values
       </description>
     </class>
+  
+    <class name="gridMapFiltersDrs/PotentialGoalFieldFilter" type="grid_map::PotentialGoalFieldFilter<grid_map::GridMap>" base_class_type="filters::FilterBase<grid_map::GridMap>">
+      <description>
+        Computes a potential field from a binary layer and a goal path
+      </description>
+    </class>
 
     <class name="gridMapFiltersDrs/RadialInpaintFilter" type="grid_map::RadialInpaintFilter<grid_map::GridMap>" base_class_type="filters::FilterBase<grid_map::GridMap>">
       <description>

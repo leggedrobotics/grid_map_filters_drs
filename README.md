@@ -118,6 +118,22 @@ It also provides the gradients in X and Y as separate layers (in the example bel
     use_binarization: true
 ```
 
+### Potential Goal Field (PGF)
+Computes a potential field with a method yet to be defined. It requires an `input_layer` with values in the [0,1] interval. It also requires an attractor path for the field given by a `Path` message.
+
+```yaml
+- name: potential_goal_field
+  type: gridMapFiltersDrs/PotentialGoalFieldFilter
+  params:
+    input_layer: traversability
+    output_layer: potential_goal_field
+  # normalize_gradients: true
+  attractor_topic: /global_planning/path
+  threshold: 0.1 # to be applied to the input layer
+  # use_field_smoothing: false
+  # field_smoothing_radius: 0.1 # m
+```
+
 ### Inpaint
 It applies inpainting using OpenCV algorithms. It's the same as `gridMapCv/InpaintFilter` but adding a `type` option
 

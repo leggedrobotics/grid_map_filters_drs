@@ -19,6 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   filters
   geometry_msgs
+  nav_msgs
   visualization_msgs
   sensor_msgs
   std_srvs
@@ -52,6 +53,7 @@ catkin_package(
                   std_msgs
                   filters
                   geometry_msgs
+                  nav_msgs
                   visualization_msgs
                   sensor_msgs
                   pcl_ros
@@ -92,6 +94,7 @@ set(FILTERS_SRC src/grid_map_filters_drs/BaseHeightThresholdFilter.cpp
                 src/grid_map_filters_drs/InpaintFilter.cpp
                 src/grid_map_filters_drs/NanFillerFilter.cpp
                 src/grid_map_filters_drs/NanMaskFilter.cpp
+                src/grid_map_filters_drs/PotentialGoalFieldFilter.cpp
                 src/grid_map_filters_drs/RadialInpaintFilter.cpp
                 src/grid_map_filters_drs/SignedDistanceField2dFilter.cpp
 )
