@@ -90,6 +90,13 @@ bool SignedDistanceField2dFilter<T>::update(const T& mapIn, T& mapOut) {
   cv::threshold(cvLayer, cvObstacleSpaceMask, 255 * threshold_, 255, cv::THRESH_BINARY);
   cvObstacleSpaceMask.convertTo(cvObstacleSpaceMask, CV_8UC1);
   cv::bitwise_not(cvObstacleSpaceMask, cvFreeSpaceMask);
+
+  // Inflate obstacles (dilate the obstacle mask)
+  int inflation_pixels = 40; // <-- Set this to the number of pixels to inflate
+  cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(2*inflation_pixels+1, 2*inflation_pixels+1));
+  cv::dilate(cvObstacleSpaceMask, cvObstacleSpaceMask, kernel);
+  // Optionally, update free space mask as well
+  cv::bitwise_not(cvObstacleSpaceMask, cvFreeSpaceMask);
   profiler_ptr_->endEvent("1.preprocess");
 
   // Compute SDF

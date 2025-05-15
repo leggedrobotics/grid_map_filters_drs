@@ -91,6 +91,7 @@ class PotentialGoalFieldFilter : public filters::FilterBase<T> {
 
   //! Attractor path
   nav_msgs::Path attractorPath_;
+  nav_msgs::Path inputPath_;
   grid_map::GridMap map_;
 
   //! Smooth field options
@@ -121,6 +122,7 @@ class PotentialGoalFieldFilter : public filters::FilterBase<T> {
 
   //! Marker publisher
   ros::Publisher markerPublisher_;
+  ros::Publisher attractorPathPublisher_;
 
   //! Timer for updating the path
   ros::Timer timer_;

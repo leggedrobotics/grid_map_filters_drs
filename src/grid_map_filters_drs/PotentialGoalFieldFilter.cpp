@@ -102,6 +102,9 @@ namespace grid_map
         markerPublisher_ = nodeHandle_.advertise<visualization_msgs::Marker>("/field_local_planner/path_heading_direction", 1);
         timer_ = nodeHandle_.createTimer(ros::Duration(1.0), &PotentialGoalFieldFilter::timerCallback, this);
 
+        // Add publisher for attractor path
+        attractorPathPublisher_ = nodeHandle_.advertise<nav_msgs::Path>("/field_local_planner/attractor_path", 1);
+
         return true;
     }
 
@@ -115,13 +118,13 @@ namespace grid_map
 
         // If the timestamps are the same, skip (to avoid TF_REPEATED_DATA issue)
         //   if (msg->header.stamp == attractorStamp_) {
-        //     ROS_ERROR("Checkpoint 3");
         //     return;
         //   }
         //   attractorStamp_ = msg->header.stamp;
 
-        attractorPath_ = *msg;
-        ROS_ERROR("[PotentialGoalFieldFilter] Received attractor path.");
+        inputPath_ = *msg;
+        attractorPath_ = inputPath_;
+        ROS_INFO("[PotentialGoalFieldFilter] Received attractor path.");
     }
 
     template <typename T>
@@ -200,17 +203,17 @@ namespace grid_map
         cv::Mat cvGradientsZ(cvObstacleSpaceMask.size(), cvObstacleSpaceMask.type(), cv::Scalar(0.0));
 
         // Add free and occupied space as layers TODO: add for debugging purposes
-        //   addMatAsLayer(cvObstacleSpaceMask / 255, obstacleLayer_, mapOut);
-        //   addMatAsLayer(cvFreeSpaceMask / 255, freeSpaceLayer_, mapOut);
+        addMatAsLayer(cvObstacleSpaceMask / 255, obstacleLayer_, mapOut);
+        addMatAsLayer(cvFreeSpaceMask / 255, freeSpaceLayer_, mapOut);
 
         // This little hack makes the fast marching method work
         cvObstacleSpaceMask *= 10; // This is to enforce the difference between obstacles and free space
-        cvObstacleSpaceMask += 1;  // This adds a baseline layer to start the propagation
+        // cvObstacleSpaceMask += 1;  // This adds a baseline layer to start the propagation
 
         // Smooth field by applying Gaussian Smoothing
         // This is similar to the 'saturation' method used in
         // FM2 by Javier V. Gomez: https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=6582543
-        if (fieldSmoothing_)
+        // if (fieldSmoothing_)
         {
             int radiusInPixels = std::max((int)std::ceil(fieldSmoothingRadius_ / mapIn.getResolution()), 3); // Minimum kernel of size 3
             radiusInPixels = (radiusInPixels % 2 == 0) ? radiusInPixels + 1 : radiusInPixels;
@@ -229,14 +232,28 @@ namespace grid_map
 
         Eigen::Vector2d totalVector(0.0, 0.0);
 
+        // ROS_INFO("Length of attractorPath_: %zu", attractorPath_.poses.size());
+
+        // Exponential decay factor: tune this value (0 < decay_factor <= 1)
+        double decay_factor = 0.8;
+
+        size_t N = attractorPath_.poses.size();
+        size_t idx = 0;
         for (const auto &pose : attractorPath_.poses)
         {
             grid_map::Position pathPosition(pose.pose.position.x, pose.pose.position.y);
-            Eigen::Vector2d vectorToPathPoint = pathPosition - currentPosition;
-            totalVector += vectorToPathPoint;
+            double distance = (pathPosition - currentPosition).norm();
+            if (distance > 0.2 || N > 1) { // Make it zero if there's only one point left and we're at the goal
+                Eigen::Vector2d vectorToPathPoint = pathPosition - currentPosition;
+                double weight = std::pow(decay_factor, idx); // Exponential decay
+                // Use 1/distance as the decay factor, avoid division by zero
+                // double weight = (distance > 1e-6) ? (1.0 / distance) : 0.0;
+                totalVector += weight * vectorToPathPoint;
+            }
+            ++idx;
         }
-        ROS_INFO("Vector: [%f, %f]", totalVector.x(), totalVector.y());
-
+        // ROS_INFO("Vector: [%f, %f]", totalVector.x(), totalVector.y());
+        
         if (totalVector.norm() > 0) {
             totalVector.normalize();
         }
@@ -264,6 +281,9 @@ namespace grid_map
         // Normalize the cvGeodesicDistance to ensure values are within a specific range
         double scale = 100.0;
         cv::normalize(cvGeodesicDistance, cvGeodesicDistance, 0, scale, cv::NORM_MINMAX);
+
+        // Set obstacle regions to 0 in the potential field
+        cvGeodesicDistance.setTo(0, cvObstacleSpaceMask > 0);
 
         // ###############################################################################
         // ################################ key algorithm ################################
@@ -302,10 +322,14 @@ namespace grid_map
         marker.scale.y = 0.2; // Head diameter
         marker.scale.z = 0.2; // Head length
         marker.color.a = 1.0; // Alpha
-        marker.color.r = 1.0; // Red
+        marker.color.r = 0.0; // Red
         marker.color.g = 0.0; // Green
-        marker.color.b = 0.0; // Blue
+        marker.color.b = 1.0; // Blue
+        
+        // Marker position
+        marker.pose.orientation.w = 1.0;
 
+        // Start and end of arrow
         geometry_msgs::Point start, end;
         start.x = currentPosition.x();
         start.y = currentPosition.y();
@@ -342,32 +366,45 @@ namespace grid_map
     template <typename T>
     void PotentialGoalFieldFilter<T>::timerCallback(const ros::TimerEvent &)
     {
-        if (attractorPath_.poses.empty() || mapFrame_ == "not_set")
+        if (inputPath_.poses.empty() || mapFrame_ == "not_set")
         {
             return;
         }
-
+        
         // Get the current position of the robot
         grid_map::Position currentPosition = map_.getPosition();
 
-        // Find the closest point on the path
-        auto closestIt = std::min_element(attractorPath_.poses.begin(), attractorPath_.poses.end(),
+        // Make a copy of the input path to potentially shorten
+        nav_msgs::Path updatedAttractorPath = inputPath_;
+        auto closestIt = std::min_element(updatedAttractorPath.poses.begin(), updatedAttractorPath.poses.end(),
                                           [&currentPosition](const geometry_msgs::PoseStamped &a, const geometry_msgs::PoseStamped &b)
                                           {
                                               grid_map::Position posA(a.pose.position.x, a.pose.position.y);
                                               grid_map::Position posB(b.pose.position.x, b.pose.position.y);
                                               return (posA - currentPosition).norm() < (posB - currentPosition).norm();
                                           });
-
-        // Erase all points up to and including the closest point if the distance is under 2 meters
-        if (closestIt != attractorPath_.poses.end())
+        
+        // Erase all points up to and including the closest point,
+        // unless the closest point is the last in the path (keep the goal)
+        if (closestIt != updatedAttractorPath.poses.end())
         {
-            grid_map::Position closestPos(closestIt->pose.position.x, closestIt->pose.position.y);
-            if ((closestPos - currentPosition).norm() < 2.0)
-            {
-                attractorPath_.poses.erase(attractorPath_.poses.begin(), closestIt + 1);
+            if (std::next(closestIt) != updatedAttractorPath.poses.end()) {
+                // Not the last point: erase up to and including closestIt
+                updatedAttractorPath.poses.erase(updatedAttractorPath.poses.begin(), std::next(closestIt));
+            } else {
+                // Closest point is the last: do not erase it
+                updatedAttractorPath.poses.erase(updatedAttractorPath.poses.begin(), closestIt);
             }
         }
+
+        // Only update attractorPath_ if the new path is shorter
+        if (updatedAttractorPath.poses.size() < attractorPath_.poses.size())
+        {
+            attractorPath_ = updatedAttractorPath;
+        }
+
+        // Publish the attractorPath_
+        attractorPathPublisher_.publish(attractorPath_);
     }
 
 } // namespace grid_map
