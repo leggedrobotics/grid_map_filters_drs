@@ -60,6 +60,12 @@
       </description>
     </class>
 
+    <class name="gridMapFiltersDrs/GeodesicDistanceField2dSnapFilter" type="grid_map::GeodesicDistanceField2dSnapFilter<grid_map::GridMap>" base_class_type="filters::FilterBase<grid_map::GridMap>">
+      <description>
+        Computes a Geodesic Distance field from a binary layer with the addition of snapping the goal to the lowest point of the signed distance field
+      </description>
+    </class>
+
     <class name="gridMapFiltersDrs/GeodesicFieldFilter" type="grid_map::GeodesicFieldFilter<grid_map::GridMap>" base_class_type="filters::FilterBase<grid_map::GridMap>">
       <description>
         Computes a Geodesic Distance field from a layer

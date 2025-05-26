@@ -118,6 +118,23 @@ It also provides the gradients in X and Y as separate layers (in the example bel
     use_binarization: true
 ```
 
+### Geodesic Distance Snap Field 2D (GDF)
+Same as the Geodesic Distance Field 2D, but instead of doing a spiral search to find alternative goals if the goal is outside the map, it checks the signed distance field defined by `sdf_layer` in the radius `sdf_search_radius` to find a reasonable local point to snap the goal to.
+
+```yaml
+- name: geodesic
+  type: gridMapFiltersDrs/GeodesicDistanceField2dFilter
+  params:
+    input_layer: traversability
+    output_layer: geodesic
+    normalize_gradients: true
+    attractor_topic: /goal
+    threshold: 0.5 # Only applicable when using binarization
+    use_binarization: true
+    sdf_layer: sdf
+    sdf_search_radius: 4.0 # m
+```
+
 ### Potential Goal Field (PGF)
 Computes a potential field with a method yet to be defined. It requires an `input_layer` with values in the [0,1] interval. It also requires an attractor path for the field given by a `Path` message.
 
@@ -127,11 +144,8 @@ Computes a potential field with a method yet to be defined. It requires an `inpu
   params:
     input_layer: traversability
     output_layer: potential_goal_field
-  # normalize_gradients: true
   attractor_topic: /global_planning/path
   threshold: 0.1 # to be applied to the input layer
-  # use_field_smoothing: false
-  # field_smoothing_radius: 0.1 # m
 ```
 
 ### Inpaint

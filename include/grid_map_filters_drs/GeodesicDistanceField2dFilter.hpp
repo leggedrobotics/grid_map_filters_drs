@@ -57,11 +57,11 @@ class GeodesicDistanceField2dFilter : public filters::FilterBase<T> {
    */
   virtual bool update(const T& mapIn, T& mapOut);
 
- private:
+ protected:
   /*!
    * Finds a valid attractor in the current grid map
    */
-  grid_map::Index getAttractorIndex(const T& gridMap, const grid_map::Position& attractorPosition);
+  virtual grid_map::Index getAttractorIndex(const T& gridMap, const grid_map::Position& attractorPosition);
 
   /*!
    * Helper to fill layers with cv::Mats
